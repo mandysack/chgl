@@ -13,9 +13,13 @@ use FileSystem;
 config const ValidIPRegex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 config const datasetDirectory = "../../data/DNS/";
 config const outputDirectory = "tmp/";
+config const badIPAddressFile = datasetDirectory + "../ip-most-wanted.txt";
+config const badDNSFile = datasetDirectory + "../dns-most-wanted.txt";
 config const metricsOutput = outputDirectory + "metrics.txt";
 config const componentsOutput = outputDirectory + "collapsed-hypergraph-components.txt";
 config const hypergraphOutput = outputDirectory + "collapsed-hypergraph.txt";
+config const preCVertexDegreeDistr = outputDirectory + "pc-vertexdegreedistribution.txt";
+config const preCEdgeDegreeDistr = outputDirectory + "pc-edgedreedistribution.txt";
 config const badDNSNamesRegex = "^[a-zA-Z]{4,5}\\.(pw|us|club|info|site|top)$";
 config const preCollapseMetrics = true;
 config const preCollapseComponents = true;
@@ -45,41 +49,55 @@ var ValidIPRegexp = compile(ValidIPRegex);
 var badDNSNamesRegexp = compile(badDNSNamesRegex);
 var masterPropertyMap = EmptyPropertyMap;
 var f = open(metricsOutput, iomode.cw).writer();
+
 var t = new Timer();
 var tt = new Timer();
 var files : [0..-1] string;
 tt.start();
 var wq = new WorkQueue(string);
 
+var idx = 0;
 var badIPAddresses : domain(string);
 var badDNSNames : domain(string);
-for line in getLines("../../data/ip-most-wanted.txt") {
+for line in getLines(badIPAddressFile) {
     badIPAddresses += line;
 }
-for line in getLines("../../data/dns-most-wanted.txt") {
+for line in getLines(badDNSFile) {
     badDNSNames += line;
 }
-
 proc getMetrics(graph, prefix, doComponents, cachedComponents) {
+    var fvdd = open(outputDirectory+prefix+"-vertexdegreedistribution.txt", iomode.cw).writer();
     f.writeln("(", prefix, ") #V = ", graph.numVertices);
     f.writeln("(", prefix, ") #E = ", graph.numEdges);
     f.flush();
     f.writeln("(", prefix, ") Vertex Degree Distribution:");
+    idx = 0;
     {
         var vDeg = vertexDegreeDistribution(graph);
         for (deg, freq) in zip(vDeg.domain, vDeg) {
             if freq != 0 then f.writeln("\t", deg, ",", freq);
+	    if freq != 0 then fvdd.writeln(idx,":", deg, ",", freq);
+	    idx= idx +1;
         }
     }
+    fvdd.flush();
+    fvdd.close(); 
     f.flush();
     f.writeln("(", prefix, ") Edge Cardinality Distribution:");
+    var fedd = open(outputDirectory+prefix+"-edgedegreedistribution.txt", iomode.cw).writer();
+    idx = 0;
     {
         var eDeg = edgeDegreeDistribution(graph);
         for (deg, freq) in zip(eDeg.domain, eDeg) {
             if freq != 0 then f.writeln("\t", deg, ",", freq);
+	    if freq != 0 then fedd.writeln(idx,":", deg, ",", freq);
+	    idx= idx +1;
         }
     }
+    fedd.flush();
+    fedd.close();
     f.flush();
+    idx = 0;
     if doComponents then for s in 1..3 {
         var componentMappings = cachedComponents[s].cachedComponentMappings;
         var componentsDom : domain(int);
@@ -118,6 +136,7 @@ proc getMetrics(graph, prefix, doComponents, cachedComponents) {
         f.flush();
         delete components;
     }
+   
 }
 
 proc searchBlacklist(graph, prefix, cachedComponents) {
@@ -309,6 +328,7 @@ f.writeln("Hypergraph Construction: ", t.elapsed());
 t.clear();
 writeln("Number of Inclusions: ", graph.getInclusions());
 writeln("Deleting Duplicate edges: ", graph.removeDuplicates());
+f.writeln("Deleting Duplicate edges: ", graph.removeDuplicates());
 writeln("Number of Inclusions: ", graph.getInclusions());
 
 // Cached components to avoid its costly recalculation...
