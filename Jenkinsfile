@@ -8,22 +8,37 @@ pipeline {
             steps {
                 sshagent (['250e32c1-122e-43f7-953d-46324a8501b9']) {
                     // Send workspace to puma.pnl.gov
-                    sh 'ssh jenkins@puma.pnl.gov rm -rf $CHGL_WORKSPACE'
-                    sh 'scp -r $WORKSPACE jenkins@puma.pnl.gov:$CHGL_WORKSPACE'
+                    sh 'ssh puma.pnl.gov rm -rf $CHGL_WORKSPACE'
+                    sh 'scp -r $WORKSPACE puma.pnl.gov:$CHGL_WORKSPACE'
 
                     // SSH to puma.pnl.gov and execute jenkins-build.sh
-                    //sh 'ssh jenkins@puma.pnl.gov "bash -s" < jenkins-build.sh'
-                    sh 'ssh jenkins@puma.pnl.gov "chmod 755 $CHGL_WORKSPACE/jenkins-build.sh"'
-                    sh 'ssh jenkins@puma.pnl.gov "bash -l -c $CHGL_WORKSPACE/jenkins-build.sh"'
+                    sh 'ssh puma.pnl.gov "chmod 755 $CHGL_WORKSPACE/jenkins-build.sh"'
+                    sh 'ssh puma.pnl.gov "bash -l -c $CHGL_WORKSPACE/jenkins-build.sh"'
 
                     // Get results back from puma.pnl.gov
-                    sh 'scp -r jenkins@puma.pnl.gov:$CHGL_WORKSPACE/test/unit/Logs $WORKSPACE/test/unit'
-                    sh 'scp -r jenkins@puma.pnl.gov:$CHGL_WORKSPACE/test/performance/Logs $WORKSPACE/test/performance'
-                    sh 'scp -r jenkins@puma.pnl.gov:$CHGL_WORKSPACE/test/performance/dat $WORKSPACE/test/performance'
+                    sh 'scp -r puma.pnl.gov:$CHGL_WORKSPACE/test_performance/Logs $WORKSPACE/test_performance'
+                    sh 'scp -r puma.pnl.gov:$CHGL_WORKSPACE/test_performance/dat $WORKSPACE/test_performance'
+                }
+                sshagent (['40cddb85-453e-48cc-850e-942ca9edab7c']) {
+                    // Push CHGL performance graphs to gh-pages
+                    sh '''
+                        cd $WORKSPACE/test_performance/dat
+                        mkdir tmp
+                        cd tmp
+                        git clone -b gh-pages --single-branch https://github.com/pnnl/chgl.git
+                        cd chgl
+                        cp -r $WORKSPACE/test_performance/dat/html performance
+                        git add .
+                        git commit -m "Performance Test Update"
+                        git push
+                        cd ../..
+                        rm -rf tmp
+                    '''
                 }
             }
             post {
                 always { 
+                    archiveArtifacts artifacts: 'test/**/dat/**/*.*'
                     junit 'test/**/Logs/*.xml' 
                     perfReport 'test/**/Logs/*.xml'
                 }

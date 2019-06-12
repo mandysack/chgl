@@ -2,12 +2,18 @@
 *
 !/**/
 !*.*
+!COMPOPTS
+!DISCLAIMER
+!Dockerfile
+!GRAPHFILES
+!LICENSE
 
 # test output
 *.comp.out.tmp
-/test/performance/dat/
-/test/performance/Logs/
-/test/unit/Logs/
+*.exec.out.tmp
+/test_performance/dat/
+/test_performance/Logs/
+/test/Logs/
 
 # chpldoc generated content
 /docs/
@@ -17,3 +23,4 @@ Mason.lock
 
 # chpldoc deploy key
 deploy_key
+*.swp
